@@ -50,14 +50,9 @@ svn import . $1 -m "Created svn repository structure" || exit;
 #change back to our git repo
 cd -
 
-# create an empty root commit to rebase the master upon
-git symbolic-ref HEAD refs/heads/$TMPBRANCH
+#clean the current repo
 git rm --cached -r .
 git clean -f -d
-git commit --allow-empty -m 'Empty Commit'
-git cherry-pick $(git rev-list --reverse master | head -1)
-git rebase --onto $TMPBRANCH $TMPBRANCH master
-git branch -d $TMPBRANCH
 
 #import the empty svn repo into git
 git svn init --prefix=svn/ $1 --branches=branches --trunk=trunk --tags=tags .
@@ -65,10 +60,14 @@ git svn fetch
 
 #create a temporary branch
 git checkout -b $TMPBRANCH svn/trunk
+
 #rebase our master branch on this temp branch
+git cherry-pick $(git rev-list --reverse master | head -1)
 git rebase --onto $TMPBRANCH $TMPBRANCH master
+
 #delete the temp branch
-git branch -D $TMPBRANCH
+git branch -d $TMPBRANCH
+
 #push out the commits to svn
 git svn dcommit
 
