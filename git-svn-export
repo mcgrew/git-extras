@@ -32,7 +32,8 @@
 #   SCRIPT!!
 
 #create a random string for temporary use
-TMPBRANCH=`echo $RAMDOM$RANDOM$RANDOM$RANDOM$RANDOM | base64 | tr -d \\n\=`
+TMP_BRANCH=$(echo $RAMDOM$RANDOM$RANDOM$RANDOM$RANDOM | base64 | tr -d \\n\=)
+CURRENT_BRANCH=$(git branch | grep ^\* | awk '{print $2}')
 
 # check for a valid git repo
 if [ ! -d .git ]; then
@@ -40,34 +41,42 @@ if [ ! -d .git ]; then
 	exit;
 fi;
 
-# create the proper directory structure in EMPTY svn repo
+# create the proper directory structure in an EMPTY svn repo
 # make sure the repo is completely new, else this probably won't work
-mkdir /tmp/$TMPBRANCH
-cd /tmp/$TMPBRANCH
+mkdir /tmp/$TMP_BRANCH
+cd /tmp/$TMP_BRANCH
 mkdir trunk branches tags
 svn import . $1 -m "Created svn repository structure" || exit; 
 
 #change back to our git repo
 cd -
 
-#clean the current repo
-git rm --cached -r .
-git clean -f -d
+# stash any uncommitted changes
+git reset HEAD
+if [ $(git stash save | wc -l) -gt 1 ]; then
+	STASH="true"
+fi;
+#git rm --cached -r .
+#git clean -f -d
 
 #import the empty svn repo into git
 git svn init --prefix=svn/ $1 --branches=branches --trunk=trunk --tags=tags .
 git svn fetch
 
 #create a temporary branch
-git checkout -b $TMPBRANCH svn/trunk
+git checkout -b $TMP_BRANCH svn/trunk
 
-#rebase our master branch on this temp branch
-git cherry-pick $(git rev-list --reverse master | head -1)
-git rebase --onto $TMPBRANCH $TMPBRANCH master
+#rebase our $CURRENT_BRANCH branch on this temp branch
+git cherry-pick $(git rev-list --reverse $CURRENT_BRANCH | head -1)
+git rebase --onto $TMP_BRANCH $TMP_BRANCH $CURRENT_BRANCH
 
 #delete the temp branch
-git branch -d $TMPBRANCH
+git branch -d $TMP_BRANCH
 
 #push out the commits to svn
 git svn dcommit
 
+#re-apply any uncommitted changes
+if [ $STASH ]; then
+	git stash apply 
+fi;
