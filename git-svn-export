@@ -56,8 +56,8 @@ git reset HEAD
 if [ $(git stash save | wc -l) -gt 1 ]; then
 	STASH="true"
 fi;
-#git rm --cached -r .
-#git clean -f -d
+git rm --cached -r .
+git clean -f -d
 
 #import the empty svn repo into git
 git svn init --prefix=svn/ $1 --branches=branches --trunk=trunk --tags=tags .
