@@ -43,13 +43,15 @@ fi;
 
 # create the proper directory structure in an EMPTY svn repo
 # make sure the repo is completely new, else this probably won't work
-mkdir /tmp/$TMP_BRANCH
-cd /tmp/$TMP_BRANCH
-mkdir trunk branches tags
-svn import . $1 -m "Created svn repository structure" || exit; 
+if [ ! $(svn ls $1 | wc -l) ]; then
+	mkdir /tmp/$TMP_BRANCH
+	cd /tmp/$TMP_BRANCH
+	mkdir trunk branches tags
+	svn import . $1 -m "Created svn repository structure" || exit; 
 
-#change back to our git repo
-cd -
+	#change back to our git repo
+	cd -
+fi;
 
 # stash any uncommitted changes
 git reset HEAD
