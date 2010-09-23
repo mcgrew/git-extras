@@ -31,34 +31,51 @@
 #   NOT CORRUPT YOUR REPOSITORY. PLEASE BACKUP BEFORE EXECUTING THIS
 #   SCRIPT!!
 
-#create a random string for temporary use
-TMP_BRANCH=$(echo $RAMDOM$RANDOM$RANDOM$RANDOM$RANDOM | base64 | tr -d \\n\=)
-CURRENT_BRANCH=$(git branch | grep ^\* | awk '{print $2}')
-
 # check for a valid git repo
 if [ ! -d .git ]; then
 	echo "This does not appear to be the root directory of a valid git repository";
 	exit;
 fi;
 
+#create a random string for temporary use
+TMP_BRANCH=$(dd if=/dev/urandom bs=30 count=1 2>/dev/null | base64 -w0 | tr \/\+ ._ | tr -d \\n\=)
+CURRENT_BRANCH=$(git branch | grep ^\* | awk '{print $2}')
+
+
 # create the proper directory structure in an EMPTY svn repo
-# make sure the repo is completely new, else this probably won't work
-if [ ! $(svn ls $1 | wc -l) ]; then
+# make sure the repo is completely new, else this won't work
+if [ $(svn ls $1 2>&1 | wc -l) -gt 0 ]; then
+	echo "Unable to find a valid empty repository at '$1', aborting."
+	exit
+else
 	mkdir /tmp/$TMP_BRANCH
 	cd /tmp/$TMP_BRANCH
 	mkdir trunk branches tags
 	svn import . $1 -m "Created svn repository structure" || exit; 
 
 	#change back to our git repo
-	cd -
+	cd - > /dev/null
+	rm -rf /tmp/$TMP_BRANCH
 fi;
 
+# back up the .git directory, just in case :)
+PWD_BASE=$(basename $(pwd))
+BACKUP=/tmp/${PWD_BASE}.git.tar.gz # $(date +%Y.%m.%d).tar.gz
+cd ../
+tar -zcf $BACKUP $PWD_BASE
+echo "Backed up the current repository to $BACKUP"
+echo "If something goes wrong, you can restore it by running: "
+echo "	cd $(pwd) && rm -rf $PWD_BASE && tar -zxf $BACKUP"
+echo
+cd - > /dev/null
+
+git add .
 # stash any uncommitted changes
-git reset HEAD
 if [ $(git stash save | wc -l) -gt 1 ]; then
+	echo "Stashed uncommitted changes."
 	STASH="true"
 fi;
-git rm --cached -r .
+#git rm --cached -r .
 git clean -f -d
 
 #import the empty svn repo into git
@@ -80,5 +97,7 @@ git svn dcommit
 
 #re-apply any uncommitted changes
 if [ $STASH ]; then
-	git stash apply 
+	git stash pop 
 fi;
+git reset HEAD
+
