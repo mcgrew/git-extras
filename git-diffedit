@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ ! -e "$1" ]; then
+	echo "Unable to locate file $1"
+	exit 1;
+fi;
+
+tmpfilename="$1.old~$(dd if=/dev/urandom bs=12 count=1 2>/dev/null | base64 | tr /+ _-)"
+set -e
+
+if [ ! -z "$(git status | grep modified | grep '$1' | cut -d: -f2 | sed -e 's/^\W*//g' -e 's/\W*$//g')" ]; then
+	git stash > /dev/null
+	cp "$1" "$tmpfilename"
+	git stash pop > /dev/null
+else
+	git checkout HEAD^ -- "$1"
+	cp "$1" "$tmpfilename"
+	git reset HEAD "$1" > /dev/null || echo -n
+	git checkout "$1"
+fi
+
+if [ "$EDITOR" == "emacs" ]; then
+	emacs --eval '(ediff-files "$1" "$tmpfilename")'
+else
+	vimdiff "$1" "$tmpfilename"
+fi;
+rm "$tmpfilename"
+
+
