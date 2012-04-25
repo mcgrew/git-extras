@@ -1,5 +1,31 @@
 #!/bin/bash
 
+#License:
+# MIT license.
+# 
+# Copyright (c) 2009 Thomas McGrew
+#  
+#  Permission is hereby granted, free of charge, to any person
+#  obtaining a copy of this software and associated documentation
+#  files (the "Software"), to deal in the Software without
+#  restriction, including without limitation the rights to use,
+#  copy, modify, merge, publish, distribute, sublicense, and/or sell
+#  copies of the Software, and to permit persons to whom the
+#  Software is furnished to do so, subject to the following
+#  conditions:
+#   
+#   The above copyright notice and this permission notice shall be
+#   included in all copies or substantial portions of the Software.
+#    
+#   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+#   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+#   OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+#   NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+#   HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+#   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+#   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+#   OTHER DEALINGS IN THE SOFTWARE.
+
 if [ $# -lt 1 ]; then
 	echo
 	echo "diffedit pulls the last changed revision of a file from git and opens it"
@@ -14,16 +40,23 @@ if [ ! -e "$1" ]; then
 	exit 1;
 fi;
 
+# create a temporary filename for the old revision.
 tmpfilename="$1.old~$(dd if=/dev/urandom bs=12 count=1 2>/dev/null | base64 | tr /+ _-)"
+# exit on any errors.
 set -e
 
+# check to see if there are uncommitted changes.
 if [ ! -z "$(git status | grep modified | grep '$1' | cut -d: -f2 | sed -e 's/^\W*//g' -e 's/\W*$//g')" ]; then
+	# there are uncommitted changes to this file, so stash and use the file 
+	# from HEAD for the old version
 	git stash > /dev/null
 	cp "$1" "$tmpfilename"
 	git stash pop > /dev/null
 else
+	# no uncommitted changes, pull from the last changed revision of the file
 	lastchange=$(git whatchanged "$1" 2>/dev/null | grep ^commit | tail -n +2 | head -1 | cut -d" " -f2)
 	if [ -z "$lastchange" ]; then
+		# no previous versions of this file
 		echo "File '$1' appears to be unknown to git or has no previous versions."
 		exit 1;
 	else
@@ -35,11 +68,13 @@ else
 	git checkout "$1"
 fi
 
+# open in a diff editor
 if [ "$EDITOR" == "emacs" ]; then
 	emacs --eval '(ediff-files "$1" "$tmpfilename")'
 else
 	vimdiff "$1" "$tmpfilename"
 fi;
+# remove the temporary file
 rm -f "$tmpfilename"
 
 
