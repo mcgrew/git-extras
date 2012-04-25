@@ -1,7 +1,16 @@
 #!/bin/bash
 
+if [ $# -lt 1 ]; then
+	echo
+	echo "diffedit pulls the last changed revision of a file from git and opens it"
+	echo "along with the current version in a diff editor for line-by-line editing."
+	echo
+	echo "Usage: git diffedit <filename>"
+	exit 0;
+fi;
+
 if [ ! -e "$1" ]; then
-	echo "Unable to locate file $1"
+	echo "Unable to locate file '$1'"
 	exit 1;
 fi;
 
@@ -13,7 +22,14 @@ if [ ! -z "$(git status | grep modified | grep '$1' | cut -d: -f2 | sed -e 's/^\
 	cp "$1" "$tmpfilename"
 	git stash pop > /dev/null
 else
-	git checkout HEAD^ -- "$1"
+	lastchange=$(git whatchanged "$1" 2>/dev/null | grep ^commit | tail -n +2 | head -1 | cut -d" " -f2)
+	if [ -z "$lastchange" ]; then
+		echo "File '$1' appears to be unknown to git or has no previous versions."
+		exit 1;
+	else
+		echo "Pulling '$1' from last changed revision '$lastchange'";
+		git checkout $lastchange -- "$1" 2>/dev/null
+	fi;
 	cp "$1" "$tmpfilename"
 	git reset HEAD "$1" > /dev/null || echo -n
 	git checkout "$1"
@@ -24,6 +40,6 @@ if [ "$EDITOR" == "emacs" ]; then
 else
 	vimdiff "$1" "$tmpfilename"
 fi;
-rm "$tmpfilename"
+rm -f "$tmpfilename"
 
 
